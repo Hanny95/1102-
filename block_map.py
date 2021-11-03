@@ -7,32 +7,38 @@ from matplotlib import font_manager, rc
 import os
 
 # 로그
-logBoolean = False
+logBoolean = True
+
+def cLL(start = True):
+    return '-' * 60 + '\n' if start else '\n' + '-' * 100
+
+def savaTempCSV(data, loc='./resources/temp.csv', m='w', e='cp949'):
+    data.to_csv(loc, mode=m, encoding=e)
 
 pd.set_option('mode.chained_assignment', None)
 
-data = pd.read_csv('C:/chh_scraping/textAnalysis/resources/공공보건의료기관현황.csv',
-            index_col=0,
-            encoding='cp949',
-            engine='python')
+data = pd.read_csv('./resources/공공보건의료기관현황.csv',
+                    index_col=0,
+                    encoding='cp949',
+                    engine='python')
 
 if logBoolean:
-    print(f'data.head() : {data.head()}')
+    print(f'data.head() : {cLL(start=False)}{data.head()}')
+
 
 # 주소에서 시도, 군구 정보 분리
 addr = pd.DataFrame(data['주소'].apply(lambda v: v.split()[:2]).tolist(), columns=('시도', '군구'))
 
 if logBoolean:
-    print(addr.head())
-
-sido = addr['시도'].unique()
-# print(sido)
-
-changwon = addr[addr['시도'] == '창원시']
+    print(f'data : {cLL(start=False)}{addr.head()}')
+    print(f'addr["시도"]{cLL()}{addr["시도"].unique()}{cLL(start=False)}')
+    print(f'addr[addr["시도"] == "창원시"]{cLL()}{addr[addr["시도"] == "창원시"]}{cLL(start=False)}')
 
 # 데이터 변경
 addr.iloc[27] = ['경상남도', '창원시']
 addr.iloc[31] = ['경상남도', '창원시']
+
+## 로그 모듈 만들기
 
 # 47라인
 addr[addr['시도'] == '경산시']
@@ -57,35 +63,45 @@ if logBoolean:
 # print(addr[addr['군구'] == '아란13길'])  75 라인
 addr.iloc[75] = ['제주특별자치도', '제주시']
 
+# 시도와 군구 컬럼 병합
 addr['시도군구'] = addr.apply(lambda r: r['시도'] + ' ' + r['군구'], axis=1)
 
 if logBoolean:
-    print(addr.head())
+    print(f'addr]{cLL()}{addr}{cLL(start=False)}')
+    savaTempCSV(addr)
 
 addr['count'] = 0
 
 if logBoolean:
-    print(addr.head())
+    print(f'addr]{cLL()}{addr}{cLL(start=False)}')
+    savaTempCSV(addr)
 
 addr_group = pd.DataFrame(addr.groupby(['시도', '군구', '시도군구'], as_index=False).count())
 
 if logBoolean:
-    print(addr_group.head())
+    print(f'addr_group{cLL()}{addr_group}{cLL(start=False)}')
+    savaTempCSV(addr_group)
+
 
 addr_group = addr_group.set_index('시도군구')
 
 if logBoolean:
-    print(addr_group.head())
+    print(f'addr_group{cLL()}{addr_group}{cLL(start=False)}')
+    savaTempCSV(addr_group)
 
-population = pd.read_excel('C:/chh_scraping/textAnalysis/resources/행정구역_시군구_별__성별_인구수_2.xlsx')
+
+##### 행정구역별 인구수 데이터 ######
+
+population = pd.read_excel('./resources/행정구역_시군구_별__성별_인구수_2.xlsx')
 
 if logBoolean:
-    print(population.head())
+    print(f'population{cLL()}{population}{cLL(start=False)}')
+
 
 population = population.rename(columns={'행정구역(시군구)별(1)':'시도', '행정구역(시군구)별(2)':'군구'})
 
 if logBoolean:
-    print(population.head())
+    print(f'population{cLL()}{population}{cLL(start=False)}')
 
 for element in range(0, len(population)):
     population['군구'][element] = population['군구'][element].strip()
@@ -93,24 +109,29 @@ for element in range(0, len(population)):
 population['시도군구'] = population.apply(lambda r: r['시도'] + ' ' + r['군구'], axis=1)
 
 if logBoolean:
-    print(population.head())
+    print(f'population{cLL()}{population}{cLL(start=False)}')
 
 population = population[population.군구 != '소계']
-
 population = population.set_index('시도군구')
 
 if logBoolean:
-    print(population.head())
+    print(f'population{cLL()}{population}{cLL(start=False)}')
+    savaTempCSV(population)
 
-addr_population_merge = pd.merge(addr_group,population, how = 'inner', left_index= True, right_index= True)
+addr_population_merge = pd.merge(addr_group,population,
+                                 how = 'inner', # inner : 교집합   outer : 합집합
+                                 left_index= True,
+                                 right_index= True)
 
 if logBoolean:
-    print(addr_population_merge.head())
+    print(f'addr_population_merge{cLL()}{addr_population_merge}{cLL(start=False)}')
+
 
 local_MC_population = addr_population_merge[['시도_x', '군구_x', 'count', '총인구수 (명)']]
 
 if logBoolean:
-    print(local_MC_population.head())
+    print(f'local_MC_population{cLL()}{local_MC_population}{cLL(start=False)}')
+
 
 # 칼럼 이름 변경
 local_MC_population = local_MC_population.rename(columns={'시도_x':'시도', '군구_x':'군구', '총인구수 (명)':'인구수'})
@@ -119,15 +140,16 @@ MC_count = local_MC_population['count']
 local_MC_population['MC_ratio'] = MC_count.div(local_MC_population['인구수'], axis = 0)*100000
 
 if logBoolean:
-    print(local_MC_population.head())
+    print(f'local_MC_population{cLL()}{local_MC_population}{cLL(start=False)}')
+    savaTempCSV(local_MC_population)
 
 
+# 시각화
 style.use('ggplot')
-
 font_name = font_manager.FontProperties(fname="C:/Windows/Fonts/malgun.ttf").get_name()
 
 rc('font', family = font_name)
-
+# 공공보건의료기관 수
 MC_ratio = local_MC_population[['count']]
 MC_ratio = MC_ratio.sort_values('count', ascending=False)
 plt.rcParams['figure.figsize'] = (25, 5)
@@ -135,6 +157,7 @@ MC_ratio.plot(kind = 'bar', rot =90)
 
 # plt.show()
 
+# 인구수 대비 공공보건의료기관 수
 MC_ratio = local_MC_population[['MC_ratio']]
 MC_ratio = MC_ratio.sort_values('MC_ratio', ascending=False)
 plt.rcParams['figure.figsize'] = (25, 5)
@@ -142,35 +165,35 @@ MC_ratio.plot(kind = 'bar', rot =90)
 
 # plt.show()
 
-logBoolean2 = True
+
 
 path = os.getcwd()
 
-data_draw_korea = pd.read_csv('C:/chh_scraping/textAnalysis/resources/data_draw_korea.csv',
+data_draw_korea = pd.read_csv('./resources/data_draw_korea.csv',
                               index_col=0,
                               encoding='UTF-8',
                               engine='python')
 
 
-if logBoolean2:
-    print(data_draw_korea.head())
+if logBoolean:
+    print(f'data_draw_korea{cLL()}{data_draw_korea}{cLL(start=False)}')
+
 
 
 data_draw_korea['시도군구'] = data_draw_korea.apply(lambda r: r['광역시도'] + ' ' + r['행정구역'], axis=1)
 
 data_draw_korea = data_draw_korea.set_index('시도군구')
 
-if logBoolean2:
-    print(data_draw_korea.head())
+if logBoolean:
+    print(f'data_draw_korea{cLL()}{data_draw_korea}{cLL(start=False)}')
 
 
 data_draw_korea_MC_popluation_all = pd.merge(data_draw_korea,local_MC_population,
                                              how='outer',
                                              left_index=True,
                                              right_index=True)
-
-if logBoolean2:
-    print(data_draw_korea_MC_popluation_all.head())
+if logBoolean:
+    print(f'data_draw_korea_MC_popluation_all{cLL()}{data_draw_korea_MC_popluation_all}{cLL(start=False)}')
 
 
 ##### 블록맵으로 시각화 ######
@@ -232,8 +255,12 @@ def draw_blockMap(blockedMap, targetData, title, color):
         else:
             fontsize, linespacing = 11, 1.2
 
-        plt.annotate(dispname, (row['x'] + 0.5, row['y'] + 0.5), weight='bold',
-                     fontsize=fontsize, ha='center', va='center', color=annocolor,
+        plt.annotate(dispname, (row['x'] + 0.5, row['y'] + 0.5),
+                     weight='bold',
+                     fontsize=fontsize,
+                     ha='center',
+                     va='center',
+                     color=annocolor,
                      linespacing=linespacing)
 
     # 시도 경계 그린다.
@@ -245,18 +272,27 @@ def draw_blockMap(blockedMap, targetData, title, color):
     # plt.gca().set_aspect(1)
     plt.axis('off')
 
-    cb = plt.colorbar(shrink=.1, aspect=10)
+    # 바 만들기기
+    cb = plt.colorbar(shrink=1, aspect=10)
     cb.set_label(datalabel)
 
     plt.tight_layout()
 
-    plt.savefig('C:/chh_scraping/' + 'blockMap_' + targetData + '.png')
+    plt.savefig('./resources/blockMap_' + targetData + '.png')
 
     plt.show()
 
 
 
-draw_blockMap(data_draw_korea_MC_popluation_all, 'count', '행정구역별 공공보건의료기관 수', 'Blues')
+draw_blockMap(data_draw_korea_MC_popluation_all,
+              'count',
+              '행정구역별 공공보건의료기관 수',
+              'Blues')
 
-draw_blockMap(data_draw_korea_MC_popluation_all, 'MC_ratio', '행정구역별 인구수 대비 공공보건의료기관 비율', 'Reds')
+draw_blockMap(data_draw_korea_MC_popluation_all,
+              'MC_ratio',
+              '행정구역별 인구수 대비 공공보건의료기관 비율',
+              'Reds')
+
+
 
